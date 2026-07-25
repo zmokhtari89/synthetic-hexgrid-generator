@@ -1,45 +1,10 @@
-# Python
+# python cache
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
 
-# Virtual Environment
+# virtual environment
 .venv/
 
-# Generated data (these are large and should not be in git)
+# generated data (large files not for git)
 data/
 output/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs and databases
-*.log
-*.sqlite
-*.sqlite3
-
-# Environment variables
-.env
-.env.local
-
-# Jupyter Notebooks (if any)
-.ipynb_checkpoints/
-
-# pytest
-.pytest_cache/
-.coverage
-htmlcov/
