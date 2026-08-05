@@ -62,39 +62,58 @@ def generate_dataset(output_dir: str, num_images: int = 1000,
     else:
         print("artifact mode: random mix")
     
+    missing_prob = (artifact_config or {}).get('missing_prob', 0.0)
+
     for i in range(num_images):
         # generate circles with random jitter (unique per image)
         circles = generator.generate_grid()
-        
-        # generate clean image
-        clean_image = create_image_from_circles(circles, image_size)
-        
-        # apply artifacts
-        if force_artifact:
-            # force a specific artifact type
-            degraded_image, modified_circles, artifact_type, artifact_strength = pipeline.apply_forced(
-                clean_image, circles, force_artifact, force_strength
+
+        # "missing circles" is a structural artifact: it must be decided
+        # before the image is rendered, so the image and the ground truth
+        # are built from one and the same (already-thinned) circle list.
+        missing_applied = False
+        missing_strength = 0.0
+        if force_artifact == 'missing':
+            keep_prob = 1.0 - force_strength if force_strength is not None else np.random.uniform(0.7, 0.95)
+            render_circles = generator.random_subset(circles, keep_prob)
+            missing_applied = True
+            missing_strength = 1.0 - keep_prob
+        elif force_artifact is None and np.random.random() < missing_prob:
+            keep_prob = np.random.uniform(0.7, 0.95)
+            render_circles = generator.random_subset(circles, keep_prob)
+            missing_applied = True
+            missing_strength = 1.0 - keep_prob
+        else:
+            render_circles = circles
+
+        # render the image from the exact circles reported in the ground truth
+        clean_image = create_image_from_circles(render_circles, image_size)
+
+        # apply pixel-level artifacts (noise/blur/illumination) on top
+        if force_artifact == 'missing':
+            degraded_image = clean_image
+            artifact_type, artifact_strength = 'missing', missing_strength
+        elif force_artifact:
+            degraded_image, _, artifact_type, artifact_strength = pipeline.apply_forced(
+                clean_image, render_circles, force_artifact, force_strength
             )
         else:
-            # random mix
-            degraded_image, modified_circles, artifact_type, artifact_strength = pipeline.apply(clean_image, circles)
-        
-        # determine which circles to save
-        if 'missing' in pipeline.applied_artifacts:
-            circles_to_save = modified_circles
-        else:
-            circles_to_save = circles
-        
+            degraded_image, _, artifact_type, artifact_strength = pipeline.apply(clean_image, render_circles)
+            if missing_applied:
+                pipeline.applied_artifacts.append('missing')
+                if artifact_type == 'clean':
+                    artifact_type, artifact_strength = 'missing', missing_strength
+
         # save image
         img_name = generate_filename('image', i, 'tif')
         img_path = output_dir / img_name
         save_tif(degraded_image, img_path)
-        
+
         # save ground truth with physics-informed uncertainties
         gt_name = generate_filename('image', i, 'json')
         gt_path = output_dir / gt_name
         save_ground_truth(
-            circles_to_save,
+            render_circles,
             img_name,
             image_size,
             gt_path,
@@ -102,7 +121,7 @@ def generate_dataset(output_dir: str, num_images: int = 1000,
             artifact_strength=artifact_strength,
             config=artifact_config
         )
-        
+
         if (i + 1) % 100 == 0:
             artifacts_str = ', '.join(pipeline.applied_artifacts) if pipeline.applied_artifacts else 'clean'
             print(f"  generated {i+1}/{num_images} (artifacts: {artifacts_str})")

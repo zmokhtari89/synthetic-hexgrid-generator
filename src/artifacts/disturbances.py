@@ -105,11 +105,14 @@ class ArtifactPipeline:
     
     def apply(self, image: np.ndarray, circles: List[Circle]) -> Tuple[np.ndarray, List[Circle], str, float]:
         """
-        apply configured artifacts to image
+        apply configured pixel-level artifacts to image
         returns: (degraded_image, modified_circles, artifact_type, artifact_strength)
-        
-        artifact_type: 'clean', 'blur', 'noise', 'illumination', 'missing'
+
+        artifact_type: 'clean', 'blur', 'noise', 'illumination'
         artifact_strength: the strength value used for uncertainty scaling
+
+        does not handle 'missing' circles — that's a structural artifact
+        decided before rendering, in generate_dataset() (main.py).
         """
         self.applied_artifacts = []
         self.artifact_strengths = {}
@@ -166,17 +169,12 @@ class ArtifactPipeline:
             final_artifact_type = 'illumination'
             final_artifact_strength = strength
             self.applied_artifacts.append('illumination')
-        
-        # 4. structural variations (missing circles)
-        if np.random.random() < self.config.get('missing_prob', 0.0):
-            keep_prob = np.random.uniform(0.7, 0.95)
-            modified_circles = add_circle_jitter(circles, 0, keep_prob)
-            strength = 1 - keep_prob
-            self.artifact_strengths['missing'] = strength
-            final_artifact_type = 'missing'
-            final_artifact_strength = strength
-            self.applied_artifacts.append('missing')
-        
+
+        # note: "missing circles" is a structural (pre-render) artifact, not a
+        # pixel-level one — it must be decided before the image is rendered so
+        # the image and ground truth share one already-thinned circle list.
+        # See generate_dataset() in main.py.
+
         # IMPORTANT: always return something, even if no artifacts applied
         return image, modified_circles, final_artifact_type, final_artifact_strength
             
@@ -253,18 +251,11 @@ class ArtifactPipeline:
             final_artifact_type = 'illumination'
             final_artifact_strength = final_strength
             self.applied_artifacts.append('illumination')
-        
-        elif artifact_type == 'missing':
-            if strength is None:
-                keep_prob = np.random.uniform(0.7, 0.95)
-            else:
-                keep_prob = 1.0 - strength  # strength = fraction missing
-            modified_circles = add_circle_jitter(circles, 0, keep_prob)
-            final_strength = 1 - keep_prob
-            final_artifact_type = 'missing'
-            final_artifact_strength = final_strength
-            self.applied_artifacts.append('missing')
-        
+
+        # note: 'missing' is not handled here — it's a structural (pre-render)
+        # artifact decided before the image exists, in generate_dataset()
+        # (main.py). apply_forced() only ever receives pixel-level types.
+
         return image, modified_circles, final_artifact_type, final_artifact_strength
         
         # 2. blur
