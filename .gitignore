@@ -8,3 +8,8 @@ __pycache__/
 # generated data (large files not for git)
 data/
 output/
+data_*/
+*.tif
+
+# private planning/review docs, not part of the submission
+docs/
