@@ -1,3 +1,16 @@
+# hex-grid packing geometry (previously hardcoded as python defaults in
+# main.py/core.py, not configurable at all). radius_ratio: circle radius as
+# a fraction of image width. spacing_ratio: center-to-center spacing as a
+# fraction of the max spacing that would still avoid overlap - must be <0.5.
+# margin: clear border kept free of circles, in pixels. jitter_std: random
+# position jitter std, in pixels. CLI flags (--radius-ratio/--spacing-ratio/
+# --margin/--jitter) override these when passed.
+generator:
+  radius_ratio: 0.049
+  spacing_ratio: 0.48
+  margin: 15.0
+  jitter_std: 2.0
+
 # artifact probabilities and strengths
 noise_prob: 0.3
 noise_max_sigma: 10.0

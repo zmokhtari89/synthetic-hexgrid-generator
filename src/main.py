@@ -134,7 +134,15 @@ if __name__ == "__main__":
     parser.add_argument('--num', type=int, default=1000, help='number of images')
     parser.add_argument('--size', type=int, default=256, help='image size (width=height)')
     parser.add_argument('--out', type=str, default='data', help='output directory')
-    parser.add_argument('--jitter', type=float, default=2.0, help='position jitter std (pixels)')
+    parser.add_argument('--jitter', type=float, default=None,
+                       help='position jitter std, pixels (default: config or 2.0)')
+    parser.add_argument('--radius-ratio', type=float, default=None,
+                       help='circle radius as a fraction of image width (default: config or 0.049)')
+    parser.add_argument('--spacing-ratio', type=float, default=None,
+                       help='center-to-center spacing as a fraction of the max non-overlap '
+                            'spacing, must be <0.5 (default: config or 0.48)')
+    parser.add_argument('--margin', type=float, default=None,
+                       help='clear border kept free of circles, pixels (default: config or 15.0)')
     parser.add_argument('--config', type=str, default='configs/default_config.yaml',
                        help='artifact configuration file')
     parser.add_argument('--seed', type=int, default=42, help='random seed')
@@ -152,12 +160,22 @@ if __name__ == "__main__":
     if Path(args.config).exists():
         with open(args.config, 'r') as f:
             artifact_config = yaml.safe_load(f)
-    
+
+    # CLI flags override the yaml config, which overrides hardcoded defaults
+    gen_config = artifact_config.get('generator', {})
+    radius_ratio = args.radius_ratio if args.radius_ratio is not None else gen_config.get('radius_ratio', 0.049)
+    spacing_ratio = args.spacing_ratio if args.spacing_ratio is not None else gen_config.get('spacing_ratio', 0.48)
+    margin = args.margin if args.margin is not None else gen_config.get('margin', 15.0)
+    jitter_std = args.jitter if args.jitter is not None else gen_config.get('jitter_std', 2.0)
+
     generate_dataset(
         output_dir=args.out,
         num_images=args.num,
         image_size=(args.size, args.size),
-        jitter_std=args.jitter,
+        radius_ratio=radius_ratio,
+        spacing_ratio=spacing_ratio,
+        jitter_std=jitter_std,
+        margin=margin,
         artifact_config=artifact_config,
         force_artifact=args.artifact,
         force_strength=args.strength,
