@@ -14,11 +14,18 @@ from utils.io_utils import save_tif, save_ground_truth, generate_filename
 
 
 def create_image_from_circles(circles: List[Circle], image_size: tuple) -> np.ndarray:
-    """render circles onto a blank image"""
+    """render circles onto a blank image, anti-aliased and at sub-pixel precision"""
     width, height = image_size
     img = np.zeros((height, width), dtype=np.uint8)
+    # cv2.circle's `shift` param takes fixed-point coordinates: multiply by
+    # 2**shift and round, instead of the old int() truncation, so a circle
+    # at x=10.7 is actually drawn at 10.7, not snapped to 10
+    shift = 4
+    scale = 1 << shift
     for c in circles:
-        cv2.circle(img, (int(c.x), int(c.y)), int(c.r), 255, -1)
+        center = (int(round(c.x * scale)), int(round(c.y * scale)))
+        radius = int(round(c.r * scale))
+        cv2.circle(img, center, radius, 255, -1, lineType=cv2.LINE_AA, shift=shift)
     return img
 
 
