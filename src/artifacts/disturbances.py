@@ -76,21 +76,6 @@ def add_uneven_illumination(image: np.ndarray, gradient_x: float = 0.0,
     return np.clip(result, 0, 255).astype(np.uint8)
 
 
-def add_circle_jitter(circles: List[Circle], max_shift: float = 2.0,
-                      keep_prob: float = 1.0) -> List[Circle]:
-    """
-    apply structural variations to circles (jitter and missing)
-    this modifies the circle list directly, not the image
-    """
-    result = []
-    for c in circles:
-        if np.random.random() < keep_prob:
-            dx = np.random.uniform(-max_shift, max_shift)
-            dy = np.random.uniform(-max_shift, max_shift)
-            result.append(Circle(x=c.x + dx, y=c.y + dy, r=c.r))
-    return result
-
-
 class ArtifactPipeline:
     """apply random artifacts with configurable probabilities and strengths"""
     
@@ -250,7 +235,6 @@ class ArtifactPipeline:
                 final_artifact_strength = sigma
                 self.applied_artifacts.append('gaussian')
 
-
         elif artifact_type == 'illumination':
             if strength is None:
                 grad_x = np.random.uniform(-0.3, 0.3)
@@ -268,48 +252,4 @@ class ArtifactPipeline:
         # artifact decided before the image exists, in generate_dataset()
         # (main.py). apply_forced() only ever receives pixel-level types.
 
-        return image, modified_circles, final_artifact_type, final_artifact_strength
-        
-        # 2. blur
-        if np.random.random() < self.config.get('blur_prob', 0.0):
-            blur_type = np.random.choice(['gaussian', 'motion'])
-            if blur_type == 'gaussian':
-                sigma = np.random.uniform(0.5, self.config.get('blur_max_sigma', 3))
-                image = add_gaussian_blur(image, sigma)
-                self.artifact_strengths['blur'] = sigma
-                final_artifact_type = 'blur'
-                final_artifact_strength = sigma
-            else:
-                max_size = self.config.get('motion_blur_max_size', 9)
-                size = np.random.randint(3, max_size + 1, 1)[0]
-                if size % 2 == 0:
-                    size += 1
-                angle = np.random.uniform(0, 180)
-                image = add_motion_blur(image, size, angle)
-                self.artifact_strengths['blur'] = size
-                final_artifact_type = 'blur'
-                final_artifact_strength = size
-            self.applied_artifacts.append(blur_type)
-        
-        # 3. uneven illumination
-        if np.random.random() < self.config.get('illumination_prob', 0.0):
-            grad_x = np.random.uniform(-0.3, 0.3)
-            grad_y = np.random.uniform(-0.3, 0.3)
-            image = add_uneven_illumination(image, grad_x, grad_y)
-            strength = max(abs(grad_x), abs(grad_y))
-            self.artifact_strengths['illumination'] = strength
-            final_artifact_type = 'illumination'
-            final_artifact_strength = strength
-            self.applied_artifacts.append('illumination')
-        
-        # 4. structural variations (missing circles)
-        if np.random.random() < self.config.get('missing_prob', 0.0):
-            keep_prob = np.random.uniform(0.7, 0.95)
-            modified_circles = add_circle_jitter(circles, 0, keep_prob)
-            strength = 1 - keep_prob  # fraction missing
-            self.artifact_strengths['missing'] = strength
-            final_artifact_type = 'missing'
-            final_artifact_strength = strength
-            self.applied_artifacts.append('missing')
-        
         return image, modified_circles, final_artifact_type, final_artifact_strength
