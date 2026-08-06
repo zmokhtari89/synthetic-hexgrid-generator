@@ -195,50 +195,62 @@ class ArtifactPipeline:
             return image, circles, 'clean', 0.0
         
         elif artifact_type == 'blur':
-            # choose between gaussian and motion
-            blur_type = np.random.choice(['gaussian', 'motion'])
-            if blur_type == 'gaussian':
-                if strength is None:
+            if strength is None:
+                # no controlled strength requested: sub-type and strength are
+                # drawn together, so the number always matches its sub-type
+                blur_type = np.random.choice(['gaussian', 'motion'])
+                if blur_type == 'gaussian':
                     sigma = np.random.uniform(0.5, self.config.get('blur_max_sigma', 3))
+                    image = add_gaussian_blur(image, sigma)
+                    final_artifact_strength = sigma
                 else:
-                    sigma = strength
+                    max_size = self.config.get('motion_blur_max_size', 9)
+                    size = np.random.randint(3, max_size + 1, 1)[0]
+                    if size % 2 == 0:
+                        size += 1
+                    angle = np.random.uniform(0, 180)
+                    image = add_motion_blur(image, size, angle)
+                    final_artifact_strength = size
+                final_artifact_type = 'blur'
+                self.applied_artifacts.append(blur_type)
+            else:
+                # a specific strength was requested (e.g. building a
+                # controlled-degradation dataset variant): pin the sub-type to
+                # gaussian so `strength` always means the same thing (a sigma),
+                # matching Zenodo's documented blur method and this repo's
+                # sigma-based uncertainty model. Randomizing gaussian/motion
+                # here would silently give the same number two different
+                # physical meanings within one dataset variant.
+                sigma = strength
                 image = add_gaussian_blur(image, sigma)
                 final_artifact_type = 'blur'
                 final_artifact_strength = sigma
-            else:
-                max_size = self.config.get('motion_blur_max_size', 9)
-                if strength is None:
-                    size = np.random.randint(3, max_size + 1, 1)[0]
-                else:
-                    size = int(strength)
-                if size % 2 == 0:
-                    size += 1
-                angle = np.random.uniform(0, 180)
-                image = add_motion_blur(image, size, angle)
-                final_artifact_type = 'blur'
-                final_artifact_strength = size
-            self.applied_artifacts.append(blur_type)
-        
+                self.applied_artifacts.append('gaussian')
+
         elif artifact_type == 'noise':
-            noise_type = np.random.choice(['gaussian', 'salt_pepper'])
-            if noise_type == 'gaussian':
-                if strength is None:
+            if strength is None:
+                noise_type = np.random.choice(['gaussian', 'salt_pepper'])
+                if noise_type == 'gaussian':
                     sigma = np.random.uniform(1, self.config.get('noise_max_sigma', 10))
+                    image = add_gaussian_noise(image, sigma)
+                    final_artifact_strength = sigma
                 else:
-                    sigma = strength
+                    prob = np.random.uniform(0.005, self.config.get('salt_pepper_max_prob', 0.03))
+                    image = add_salt_pepper(image, prob)
+                    final_artifact_strength = prob * 100
+                final_artifact_type = 'noise'
+                self.applied_artifacts.append(noise_type)
+            else:
+                # same reasoning as blur above: pin to gaussian so `strength`
+                # consistently means a sigma, not sometimes a sigma and
+                # sometimes a salt-and-pepper probability*100.
+                sigma = strength
                 image = add_gaussian_noise(image, sigma)
                 final_artifact_type = 'noise'
                 final_artifact_strength = sigma
-            else:
-                if strength is None:
-                    prob = np.random.uniform(0.005, self.config.get('salt_pepper_max_prob', 0.03))
-                else:
-                    prob = strength / 100  # convert from strength scale to probability
-                image = add_salt_pepper(image, prob)
-                final_artifact_type = 'noise'
-                final_artifact_strength = prob * 100
-            self.applied_artifacts.append(noise_type)
-        
+                self.applied_artifacts.append('gaussian')
+
+
         elif artifact_type == 'illumination':
             if strength is None:
                 grad_x = np.random.uniform(-0.3, 0.3)
