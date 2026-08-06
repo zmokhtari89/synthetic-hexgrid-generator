@@ -25,6 +25,8 @@ def create_image_from_circles(circles: List[Circle], image_size: tuple) -> np.nd
 def generate_dataset(output_dir: str, num_images: int = 1000,
                      image_size: tuple = (256, 256),
                      radius_ratio: float = 0.049,
+                     radius_ratio_min: Optional[float] = None,
+                     radius_ratio_max: Optional[float] = None,
                      spacing_ratio: float = 0.48,
                      jitter_std: float = 2.0,
                      margin: float = 15.0,
@@ -32,39 +34,52 @@ def generate_dataset(output_dir: str, num_images: int = 1000,
                      force_artifact: Optional[str] = None,
                      force_strength: Optional[float] = None,
                      seed: int = 42) -> None:
-    
+
     np.random.seed(seed)
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     width, height = image_size
-    circle_radius = width * radius_ratio
-    
-    config = HexgridConfig(
-        image_size=image_size,
-        circle_radius=circle_radius,
-        margin=margin,
-        spacing_ratio=spacing_ratio,
-        jitter_std=jitter_std
-    )
-    
-    generator = HexgridGenerator(config)
+
+    # real Zenodo data draws one radius per image from a range, not one
+    # fixed radius for the whole dataset (see docs/task_plan_reviewed.md
+    # item 3) - only kicks in when both bounds are given, otherwise every
+    # image uses the single fixed radius_ratio, as before
+    draw_radius_per_image = radius_ratio_min is not None and radius_ratio_max is not None
+
     pipeline = ArtifactPipeline(artifact_config or {})
-    
+
     print(f"generating {num_images} images")
     print(f"image size: {width}x{height}")
-    print(f"circle radius: {circle_radius:.1f} px")
-    print(f"grid spacing: {config.spacing:.1f} px")
+    if draw_radius_per_image:
+        print(f"circle radius ratio: drawn per image from [{radius_ratio_min}, {radius_ratio_max}]")
+    else:
+        print(f"circle radius: {width * radius_ratio:.1f} px")
     print(f"jitter std: {jitter_std:.1f} px")
-    
+
     if force_artifact:
         print(f"forcing artifact: {force_artifact} (strength: {force_strength or 'random'})")
     else:
         print("artifact mode: random mix")
-    
+
     missing_prob = (artifact_config or {}).get('missing_prob', 0.0)
 
     for i in range(num_images):
+        # a new radius per image means a new spacing too (spacing derives
+        # from radius via spacing_ratio), so the config/generator has to be
+        # rebuilt every image rather than reused across the whole dataset
+        image_radius_ratio = np.random.uniform(radius_ratio_min, radius_ratio_max) if draw_radius_per_image else radius_ratio
+        circle_radius = width * image_radius_ratio
+
+        config = HexgridConfig(
+            image_size=image_size,
+            circle_radius=circle_radius,
+            margin=margin,
+            spacing_ratio=spacing_ratio,
+            jitter_std=jitter_std
+        )
+        generator = HexgridGenerator(config)
+
         # generate circles with random jitter (unique per image)
         circles = generator.generate_grid()
 
@@ -137,7 +152,15 @@ if __name__ == "__main__":
     parser.add_argument('--jitter', type=float, default=None,
                        help='position jitter std, pixels (default: config or 2.0)')
     parser.add_argument('--radius-ratio', type=float, default=None,
-                       help='circle radius as a fraction of image width (default: config or 0.049)')
+                       help='circle radius as a fraction of image width, fixed for the whole '
+                            'dataset (default: config or 0.049; ignored if --radius-ratio-min/max '
+                            'are set)')
+    parser.add_argument('--radius-ratio-min', type=float, default=None,
+                       help='lower bound of the per-image radius ratio range (default: config; '
+                            'requires --radius-ratio-max too)')
+    parser.add_argument('--radius-ratio-max', type=float, default=None,
+                       help='upper bound of the per-image radius ratio range (default: config; '
+                            'requires --radius-ratio-min too)')
     parser.add_argument('--spacing-ratio', type=float, default=None,
                        help='center-to-center spacing as a fraction of the max non-overlap '
                             'spacing, must be <0.5 (default: config or 0.48)')
@@ -164,6 +187,8 @@ if __name__ == "__main__":
     # CLI flags override the yaml config, which overrides hardcoded defaults
     gen_config = artifact_config.get('generator', {})
     radius_ratio = args.radius_ratio if args.radius_ratio is not None else gen_config.get('radius_ratio', 0.049)
+    radius_ratio_min = args.radius_ratio_min if args.radius_ratio_min is not None else gen_config.get('radius_ratio_min')
+    radius_ratio_max = args.radius_ratio_max if args.radius_ratio_max is not None else gen_config.get('radius_ratio_max')
     spacing_ratio = args.spacing_ratio if args.spacing_ratio is not None else gen_config.get('spacing_ratio', 0.48)
     margin = args.margin if args.margin is not None else gen_config.get('margin', 15.0)
     jitter_std = args.jitter if args.jitter is not None else gen_config.get('jitter_std', 2.0)
@@ -173,6 +198,8 @@ if __name__ == "__main__":
         num_images=args.num,
         image_size=(args.size, args.size),
         radius_ratio=radius_ratio,
+        radius_ratio_min=radius_ratio_min,
+        radius_ratio_max=radius_ratio_max,
         spacing_ratio=spacing_ratio,
         jitter_std=jitter_std,
         margin=margin,

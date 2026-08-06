@@ -1,12 +1,19 @@
 # hex-grid packing geometry (previously hardcoded as python defaults in
 # main.py/core.py, not configurable at all). radius_ratio: circle radius as
-# a fraction of image width. spacing_ratio: center-to-center spacing as a
-# fraction of the max spacing that would still avoid overlap - must be <0.5.
-# margin: clear border kept free of circles, in pixels. jitter_std: random
-# position jitter std, in pixels. CLI flags (--radius-ratio/--spacing-ratio/
+# a fraction of image width, used only if radius_ratio_min/max are unset.
+# radius_ratio_min/max: draw one radius per image from this range instead of
+# a fixed radius_ratio - matches real Zenodo data, where radius is constant
+# within one image but differs between images (see
+# docs/task_plan_reviewed.md item 3). spacing_ratio: center-to-center
+# spacing as a fraction of the max spacing that would still avoid overlap -
+# must be <0.5. margin: clear border kept free of circles, in pixels.
+# jitter_std: random position jitter std, in pixels. CLI flags
+# (--radius-ratio/--radius-ratio-min/--radius-ratio-max/--spacing-ratio/
 # --margin/--jitter) override these when passed.
 generator:
   radius_ratio: 0.049
+  radius_ratio_min: 0.036
+  radius_ratio_max: 0.050
   spacing_ratio: 0.48
   margin: 15.0
   jitter_std: 2.0
