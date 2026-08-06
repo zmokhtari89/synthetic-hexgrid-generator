@@ -11,19 +11,17 @@ illumination_prob: 0.3
 
 missing_prob: 0.3
 
-# uncertainty scaling parameters (physics-informed)
-# σ_r = √2 × (1 + a × S^b) / width
-# where S = artifact strength
+# uncertainty scaling parameters (physics-informed, GUM-style quadrature
+# combination of independent contributions; see compute_uncertainties() in
+# src/utils/io_utils.py for the exact formula per artifact type)
+# blur uses an exact closed form fit to real Zenodo ground truth and takes
+# no config parameters; missing needs none either (no inflation, a=0).
+# a/b below are in pixel-equivalents (divided by width internally, same
+# convention as the 1-pixel baseline term), not fitted values.
 uncertainty:
-  blur:
-    a: 0.342
-    b: 1.244
   noise:
-    a: 0.1
+    a: 0.5
     b: 1.0
   illumination:
-    a: 0.1
-    b: 1.0
-  missing:
-    a: 0.1
+    a: 10.0
     b: 1.0
