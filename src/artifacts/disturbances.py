@@ -95,9 +95,6 @@ class ArtifactPipeline:
 
         artifact_type: 'clean', 'blur', 'noise', 'illumination'
         artifact_strength: the strength value used for uncertainty scaling
-
-        does not handle 'missing' circles — that's a structural artifact
-        decided before rendering, in generate_dataset() (main.py).
         """
         self.applied_artifacts = []
         self.artifact_strengths = {}
@@ -155,12 +152,6 @@ class ArtifactPipeline:
             final_artifact_strength = strength
             self.applied_artifacts.append('illumination')
 
-        # note: "missing circles" is a structural (pre-render) artifact, not a
-        # pixel-level one — it must be decided before the image is rendered so
-        # the image and ground truth share one already-thinned circle list.
-        # See generate_dataset() in main.py.
-
-        # IMPORTANT: always return something, even if no artifacts applied
         return image, modified_circles, final_artifact_type, final_artifact_strength
             
     def apply_forced(self, image: np.ndarray, circles: List[Circle],
@@ -247,9 +238,5 @@ class ArtifactPipeline:
             final_artifact_type = 'illumination'
             final_artifact_strength = final_strength
             self.applied_artifacts.append('illumination')
-
-        # note: 'missing' is not handled here — it's a structural (pre-render)
-        # artifact decided before the image exists, in generate_dataset()
-        # (main.py). apply_forced() only ever receives pixel-level types.
 
         return image, modified_circles, final_artifact_type, final_artifact_strength

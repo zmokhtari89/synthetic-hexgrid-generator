@@ -10,7 +10,8 @@ This tool generates grayscale images (TIF format) with circles arranged on a hex
 
 - Configurable hexagonal grid generation (circle radius, spacing, margin, density), with radius either fixed per dataset or drawn per image from a range
 - Optional random position jitter (off by default, since real Zenodo circles sit exactly on the grid)
-- 4 artifact types: noise (Gaussian + impulse), blur (Gaussian + motion), uneven illumination, missing circles
+- Mandatory grid thinning (a random 20-40% of grid positions removed every image, matching real Zenodo's subject model — not an optional artifact)
+- 3 pixel-level artifact types: noise (Gaussian + impulse), blur (Gaussian + motion), uneven illumination
 - Per-artifact uncertainty scaling for x, y, and radius
 - TIF image output (anti-aliased, sub-pixel circle rendering) + JSON ground truth with uncertainties
 - Supports random artifact mixing (training) or single-artifact datasets (testing)
@@ -63,7 +64,6 @@ python src/main.py --num 200 --out data_test_blur_12 --artifact blur --strength 
 
 # Other artifacts
 python src/main.py --num 200 --out data_test_noise --artifact noise --strength 5
-python src/main.py --num 200 --out data_test_missing --artifact missing --strength 0.1
 ```
 
 ### Command Line Options
@@ -78,7 +78,7 @@ python src/main.py --num 200 --out data_test_missing --artifact missing --streng
 | `--radius-ratio-min` / `--radius-ratio-max` | Draw a different radius per image from this range instead (overrides `--radius-ratio` when both are set) | config value, else unset |
 | `--spacing-ratio` | Center-to-center spacing as a fraction of the max spacing that still avoids overlap (must be `< 0.5`) | config value, else `0.48` |
 | `--margin` | Clear border kept free of circles, in pixels | config value, else `15.0` |
-| `--artifact` | Force specific artifact type (clean/blur/noise/illumination/missing) | `None` (random mix) |
+| `--artifact` | Force specific artifact type (clean/blur/noise/illumination) | `None` (random mix) |
 | `--strength` | Artifact strength (if forced) | Random within configured range |
 | `--config` | Path to YAML config file | `configs/default_config.yaml` |
 | `--seed` | Random seed for reproducibility | `42` |
@@ -126,9 +126,6 @@ Each circle's ground truth includes an uncertainty for x, y, and r, computed in 
 - **Blur:** `σ_r = σ_xy × √(2 + S²)`, a form found by fitting to the real Zenodo blur measurements. It also matches how blur should behave physically: blurring smears the circle's edge outward without shifting its center on average, so position stays about as precise as the baseline while radius gets harder to pin down as blur increases.
 - **Noise:** an extra term grows with noise strength and is added in quadrature to both σ_xy and σ_r, since random pixel noise perturbs the whole estimate, not just the edge.
 - **Illumination:** an uneven brightness gradient is a one-sided bias rather than random spread, so it is first bounded and then converted to a comparable uncertainty before being added in quadrature.
-- **Missing circles:** a visible circle's own precision does not depend on whether other circles were removed elsewhere in the image, so this artifact adds no extra uncertainty.
-
-Only the blur formula is fitted to real measurements (Zenodo blur levels 0/3/6/12, reproduced within <4% error); the noise and illumination scalings are first-principles stand-ins with no matching real data, and are documented as such in `configs/default_config.yaml`.
 
 ---
 
@@ -147,12 +144,13 @@ generator:
   radius_ratio_max: 0.050
   spacing_ratio: 0.48
   margin: 15.0
-  jitter_std: 2.0
+  jitter_std: 0.0
+  thinning_min: 0.2
+  thinning_max: 0.4
 
 noise_prob: 0.3
 blur_prob: 0.3
 illumination_prob: 0.3
-missing_prob: 0.3
 
 uncertainty:
   noise:         {a: 0.5,  b: 1.0}  # first-principles stand-in
@@ -183,7 +181,7 @@ It checks:
 - Generated circles never overlap in the ground truth
 - Circle count stays within the configured range
 - The same seed reproduces the same output
-- Circles removed by the missing-circles artifact are actually absent from the rendered image, and every kept circle is present
+- Grid thinning is applied to every image, and thinned-out circles are actually absent from the rendered image while every kept circle is present
 
 Generate a small dataset by hand to inspect visually:
 
@@ -218,7 +216,7 @@ synthetic_hexgrid_generator/
 │   ├── generator/
 │   │   └── core.py          # Hexgrid generation + overlap check
 │   ├── artifacts/
-│   │   └── disturbances.py  # Noise, blur, illumination, missing circles
+│   │   └── disturbances.py  # Noise, blur, illumination
 │   ├── utils/
 │   │   └── io_utils.py      # TIF save, JSON ground truth, uncertainty formula
 │   └── main.py               # CLI entry point

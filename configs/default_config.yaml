@@ -13,6 +13,8 @@
 # margin: clear border kept free of circles, in pixels.
 # jitter_std: random position jitter, in pixels. Off by default - real
 # Zenodo circles sit exactly on the grid, with no jitter.
+# thinning_min/max: fraction of grid positions removed, drawn per image
+# from this range. Applied to every image (matches real Zenodo).
 generator:
   radius_ratio: 0.049
   radius_ratio_min: 0.036
@@ -20,6 +22,8 @@ generator:
   spacing_ratio: 0.48
   margin: 15.0
   jitter_std: 0.0
+  thinning_min: 0.2
+  thinning_max: 0.4
 
 # artifact probabilities and strengths
 noise_prob: 0.3
@@ -32,13 +36,10 @@ motion_blur_max_size: 9
 
 illumination_prob: 0.3
 
-missing_prob: 0.3
-
 # uncertainty scaling for noise and illumination, see compute_uncertainties()
-# in src/utils/io_utils.py. Blur and missing need no parameters here: blur
-# uses a fixed formula fitted to real Zenodo blur data, and missing adds no
-# extra uncertainty. a/b below are first-principles guesses, not fitted to
-# any measured data.
+# in src/utils/io_utils.py. Blur needs no parameters here: it uses a fixed
+# formula fitted to real Zenodo blur data. a/b below are first-principles
+# guesses, not fitted to any measured data.
 uncertainty:
   noise:
     a: 0.5

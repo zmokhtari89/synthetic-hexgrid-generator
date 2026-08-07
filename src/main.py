@@ -37,6 +37,8 @@ def generate_dataset(output_dir: str, num_images: int = 1000,
                      spacing_ratio: float = 0.48,
                      jitter_std: float = 0.0,
                      margin: float = 15.0,
+                     thinning_min: float = 0.2,
+                     thinning_max: float = 0.4,
                      artifact_config: dict = None,
                      force_artifact: Optional[str] = None,
                      force_strength: Optional[float] = None,
@@ -63,13 +65,12 @@ def generate_dataset(output_dir: str, num_images: int = 1000,
     else:
         print(f"circle radius: {width * radius_ratio:.1f} px")
     print(f"jitter std: {jitter_std:.1f} px")
+    print(f"baseline thinning: {thinning_min:.0%}-{thinning_max:.0%} of grid removed every image")
 
     if force_artifact:
         print(f"forcing artifact: {force_artifact} (strength: {force_strength or 'random'})")
     else:
         print("artifact mode: random mix")
-
-    missing_prob = (artifact_config or {}).get('missing_prob', 0.0)
 
     for i in range(num_images):
         # a new radius per image means a new spacing too (spacing derives
@@ -88,43 +89,22 @@ def generate_dataset(output_dir: str, num_images: int = 1000,
         generator = HexgridGenerator(config)
 
         # generate circles with random jitter (unique per image)
-        circles = generator.generate_grid()
+        full_circles = generator.generate_grid()
 
-        # "missing circles" is a structural artifact: it must be decided
-        # before the image is rendered, so the image and the ground truth
-        # are built from one and the same (already-thinned) circle list.
-        missing_applied = False
-        missing_strength = 0.0
-        if force_artifact == 'missing':
-            keep_prob = 1.0 - force_strength if force_strength is not None else np.random.uniform(0.7, 0.95)
-            render_circles = generator.random_subset(circles, keep_prob)
-            missing_applied = True
-            missing_strength = 1.0 - keep_prob
-        elif force_artifact is None and np.random.random() < missing_prob:
-            keep_prob = np.random.uniform(0.7, 0.95)
-            render_circles = generator.random_subset(circles, keep_prob)
-            missing_applied = True
-            missing_strength = 1.0 - keep_prob
-        else:
-            render_circles = circles
+        # mandatory baseline thinning, every image (matches real Zenodo)
+        baseline_keep_prob = np.random.uniform(1.0 - thinning_max, 1.0 - thinning_min)
+        circles = generator.random_subset(full_circles, baseline_keep_prob)
 
         # render the image from the exact circles reported in the ground truth
-        clean_image = create_image_from_circles(render_circles, image_size)
+        clean_image = create_image_from_circles(circles, image_size)
 
         # apply pixel-level artifacts (noise/blur/illumination) on top
-        if force_artifact == 'missing':
-            degraded_image = clean_image
-            artifact_type, artifact_strength = 'missing', missing_strength
-        elif force_artifact:
+        if force_artifact:
             degraded_image, _, artifact_type, artifact_strength = pipeline.apply_forced(
-                clean_image, render_circles, force_artifact, force_strength
+                clean_image, circles, force_artifact, force_strength
             )
         else:
-            degraded_image, _, artifact_type, artifact_strength = pipeline.apply(clean_image, render_circles)
-            if missing_applied:
-                pipeline.applied_artifacts.append('missing')
-                if artifact_type == 'clean':
-                    artifact_type, artifact_strength = 'missing', missing_strength
+            degraded_image, _, artifact_type, artifact_strength = pipeline.apply(clean_image, circles)
 
         # save image
         img_name = generate_filename('image', i, 'tif')
@@ -135,7 +115,7 @@ def generate_dataset(output_dir: str, num_images: int = 1000,
         gt_name = generate_filename('image', i, 'json')
         gt_path = output_dir / gt_name
         save_ground_truth(
-            render_circles,
+            circles,
             img_name,
             image_size,
             gt_path,
@@ -178,7 +158,7 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=42, help='random seed')
     
     # new arguments for forced artifacts
-    parser.add_argument('--artifact', type=str, choices=['clean', 'blur', 'noise', 'illumination', 'missing'],
+    parser.add_argument('--artifact', type=str, choices=['clean', 'blur', 'noise', 'illumination'],
                        help='force a specific artifact type (default: random mix)')
     parser.add_argument('--strength', type=float, default=None,
                        help='artifact strength (if not specified, random within configured range)')
@@ -199,6 +179,8 @@ if __name__ == "__main__":
     spacing_ratio = args.spacing_ratio if args.spacing_ratio is not None else gen_config.get('spacing_ratio', 0.48)
     margin = args.margin if args.margin is not None else gen_config.get('margin', 15.0)
     jitter_std = args.jitter if args.jitter is not None else gen_config.get('jitter_std', 0.0)
+    thinning_min = gen_config.get('thinning_min', 0.2)
+    thinning_max = gen_config.get('thinning_max', 0.4)
 
     generate_dataset(
         output_dir=args.out,
@@ -210,6 +192,8 @@ if __name__ == "__main__":
         spacing_ratio=spacing_ratio,
         jitter_std=jitter_std,
         margin=margin,
+        thinning_min=thinning_min,
+        thinning_max=thinning_max,
         artifact_config=artifact_config,
         force_artifact=args.artifact,
         force_strength=args.strength,

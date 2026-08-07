@@ -1,6 +1,5 @@
 """
-tests for the hexgrid generator and the missing-circles image/ground-truth
-contract
+tests for the hexgrid generator and the thinning image/ground-truth contract
 """
 
 import sys
@@ -62,66 +61,49 @@ def test_same_seed_reproducibility():
         assert c1.x == c2.x and c1.y == c2.y and c1.r == c2.r
 
 
-def test_missing_circles_are_absent_from_image(tmp_path):
+def test_baseline_thinning_is_mandatory_and_erased(tmp_path):
     """
-    the actual contract to protect: the 'missing' artifact must genuinely
-    erase removed circles from the image, not just drop them from the json
-    while still drawing them (the original bug in item 0/5 of
-    docs/task_plan_reviewed.md).
-
-    this replaces a blob-count check (cv2.connectedComponents count vs.
-    len(gt['circles'])) that tested the wrong thing: tightly hex-packed
-    circles can round together into one blob at render time regardless of
-    the missing-circle logic (see item 4 in the plan), so a blob-count
-    mismatch doesn't tell you whether the missing-circle contract itself is
-    broken. checking presence/absence at each circle's own center pixel
-    avoids that confound entirely: since ground-truth circles never overlap,
-    a circle's center point can never fall inside a *different* circle's
-    disk, so it's a safe point to probe regardless of any rounding/fusion
-    elsewhere in the image.
+    checks presence/absence at each circle's own center pixel rather than a
+    blob count: tightly hex-packed circles can round together into one blob
+    at render time regardless of thinning, so a blob-count mismatch doesn't
+    tell you whether thinning itself is broken. a circle's center point can
+    never fall inside a *different* circle's disk (ground truth never
+    overlaps), so it's a safe probe point.
     """
     width, height = 128, 128
-    seed = 7
+    radius_ratio = 0.049
+    out_dir = tmp_path / "clean"
 
-    for i in range(5):
-        clean_dir = tmp_path / f"clean_{i}"
-        missing_dir = tmp_path / f"missing_{i}"
+    generate_dataset(
+        output_dir=str(out_dir), num_images=3,
+        image_size=(width, height), radius_ratio=radius_ratio,
+        force_artifact='clean', seed=11,
+    )
 
-        # same seed -> the full (pre-thinning) circle list is bit-for-bit
-        # identical between the two runs, since thinning is the first thing
-        # that consumes randomness *after* grid generation
-        generate_dataset(
-            output_dir=str(clean_dir), num_images=1,
-            image_size=(width, height), force_artifact='clean', seed=seed + i,
-        )
-        generate_dataset(
-            output_dir=str(missing_dir), num_images=1,
-            image_size=(width, height), force_artifact='missing',
-            force_strength=0.3, seed=seed + i,
-        )
+    generator, _ = _make_generator(width=width, height=height, radius_ratio=radius_ratio)
+    full_circles = generator.generate_grid()
+    full_count = len(full_circles)
 
-        full_circles = json.loads((clean_dir / "image_0000.json").read_text())['circles']
-        missing_gt = json.loads((missing_dir / "image_0000.json").read_text())
-        kept_circles = missing_gt['circles']
-        img = load_tif(missing_dir / "image_0000.tif")
+    def px(c):
+        return int(c['centre']['x'] * width), int(c['centre']['y'] * height)
 
-        assert len(kept_circles) < len(full_circles), \
-            "missing artifact did not remove any circles for this seed"
+    full_positions = {(int(c.x), int(c.y)) for c in full_circles}
 
-        def px(c):
-            return int(c['centre']['x'] * width), int(c['centre']['y'] * height)
+    for i in range(3):
+        gt = json.loads((out_dir / f"image_{i:04d}.json").read_text())
+        circles = gt['circles']
+        img = load_tif(out_dir / f"image_{i:04d}.tif")
 
-        kept_positions = {px(c) for c in kept_circles}
+        assert len(circles) < full_count, \
+            f"image {i}: rendered the full, un-thinned grid ({len(circles)} circles)"
 
-        for c in kept_circles:
+        kept_positions = {px(c) for c in circles}
+
+        for c in circles:
             x, y = px(c)
-            assert img[y, x] > 0, \
-                f"seed {seed + i}: kept circle at ({x},{y}) is not drawn in the image"
+            assert img[y, x] > 0, f"image {i}: kept circle at ({x},{y}) is not drawn"
 
-        for c in full_circles:
-            pos = px(c)
-            if pos in kept_positions:
+        for x, y in full_positions:
+            if (x, y) in kept_positions:
                 continue
-            x, y = pos
-            assert img[y, x] == 0, \
-                f"seed {seed + i}: removed circle at ({x},{y}) is still drawn in the image"
+            assert img[y, x] == 0, f"image {i}: removed circle at ({x},{y}) is still drawn"

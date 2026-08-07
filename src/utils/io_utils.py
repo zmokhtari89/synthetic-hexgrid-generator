@@ -51,13 +51,9 @@ def compute_uncertainties(artifact_type: str, artifact_strength: float,
       GUM rectangular-distribution rule (u = ε/√3, since only the bound is
       known, not a distribution shape), then added in quadrature to both
       σ_xy and σ_r.
-    - missing: a visible circle's own precision doesn't degrade just
-      because other circles are absent elsewhere in the grid (independent
-      per-circle "local mean intensity" camera model) — no inflation.
 
-    all three non-blur scalings are unvalidated first-principles
-    assumptions (no Zenodo ground truth exists for noise/illumination/
-    missing variants), not fits.
+    both non-blur scalings are unvalidated first-principles assumptions (no
+    Zenodo ground truth exists for noise/illumination variants), not fits.
     """
     width, height = image_size
 
@@ -67,7 +63,7 @@ def compute_uncertainties(artifact_type: str, artifact_strength: float,
     S = artifact_strength
     params = config.get('uncertainty', {})
 
-    if artifact_type == 'clean' or S == 0 or artifact_type == 'missing':
+    if artifact_type == 'clean' or S == 0:
         return base_xy, base_r
 
     if artifact_type == 'blur':
