@@ -97,9 +97,8 @@ A geometry flag (`--jitter`, `--radius-ratio*`, `--spacing-ratio`, `--margin`) i
 Example structure matching Zenodo convention:
 ```json
 {
-  "image": "image_0000.tif",
   "domain": {"width": 1.0, "height": 1.0},
-  "camera": {"model": "synthetic generator", "resolution": [256, 256]},
+  "camera": {"model": "synthetic generator", "resolution": [256, 256], "noise": 0.0},
   "circles": [
     {
       "centre": {"x": 0.5, "y": 0.5},
@@ -107,7 +106,8 @@ Example structure matching Zenodo convention:
       "uncertainties": {"x": 0.0039, "y": 0.0039, "r": 0.0055}
     }
   ],
-  "summary": {"mean_radius": 0.049, "std_radius": 0.0005}
+  "summary": {"mean_radius": 0.049, "std_radius": 0.0005},
+  "image": "image_0000.tif"
 }
 ```
 
