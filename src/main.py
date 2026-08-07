@@ -35,7 +35,7 @@ def generate_dataset(output_dir: str, num_images: int = 1000,
                      radius_ratio_min: Optional[float] = None,
                      radius_ratio_max: Optional[float] = None,
                      spacing_ratio: float = 0.48,
-                     jitter_std: float = 2.0,
+                     jitter_std: float = 0.0,
                      margin: float = 15.0,
                      artifact_config: dict = None,
                      force_artifact: Optional[str] = None,
@@ -157,7 +157,7 @@ if __name__ == "__main__":
     parser.add_argument('--size', type=int, default=256, help='image size (width=height)')
     parser.add_argument('--out', type=str, default='data', help='output directory')
     parser.add_argument('--jitter', type=float, default=None,
-                       help='position jitter std, pixels (default: config or 2.0)')
+                       help='position jitter std, pixels (default: config or 0.0)')
     parser.add_argument('--radius-ratio', type=float, default=None,
                        help='circle radius as a fraction of image width, fixed for the whole '
                             'dataset (default: config or 0.049; ignored if --radius-ratio-min/max '
@@ -198,7 +198,7 @@ if __name__ == "__main__":
     radius_ratio_max = args.radius_ratio_max if args.radius_ratio_max is not None else gen_config.get('radius_ratio_max')
     spacing_ratio = args.spacing_ratio if args.spacing_ratio is not None else gen_config.get('spacing_ratio', 0.48)
     margin = args.margin if args.margin is not None else gen_config.get('margin', 15.0)
-    jitter_std = args.jitter if args.jitter is not None else gen_config.get('jitter_std', 2.0)
+    jitter_std = args.jitter if args.jitter is not None else gen_config.get('jitter_std', 0.0)
 
     generate_dataset(
         output_dir=args.out,

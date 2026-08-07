@@ -9,7 +9,7 @@ This tool generates grayscale images (TIF format) with circles arranged on a hex
 **Features:**
 
 - Configurable hexagonal grid generation (circle radius, spacing, margin, density), with radius either fixed per dataset or drawn per image from a range
-- Random position jitter (matching Zenodo-style variation)
+- Optional random position jitter (off by default, since real Zenodo circles sit exactly on the grid)
 - 4 artifact types: noise (Gaussian + impulse), blur (Gaussian + motion), uneven illumination, missing circles
 - Per-artifact uncertainty scaling for x, y, and radius
 - TIF image output (anti-aliased, sub-pixel circle rendering) + JSON ground truth with uncertainties
@@ -73,7 +73,7 @@ python src/main.py --num 200 --out data_test_missing --artifact missing --streng
 | `--num` | Number of images to generate | `1000` |
 | `--size` | Image size (width=height in pixels) | `256` |
 | `--out` | Output directory | `data` |
-| `--jitter` | Position jitter standard deviation (pixels) | config value, else `2.0` |
+| `--jitter` | Position jitter standard deviation (pixels) | config value, else `0.0` |
 | `--radius-ratio` | Circle radius as a fraction of image width, fixed for the whole dataset | config value, else `0.049` |
 | `--radius-ratio-min` / `--radius-ratio-max` | Draw a different radius per image from this range instead (overrides `--radius-ratio` when both are set) | config value, else unset |
 | `--spacing-ratio` | Center-to-center spacing as a fraction of the max spacing that still avoids overlap (must be `< 0.5`) | config value, else `0.48` |
@@ -92,6 +92,8 @@ A geometry flag (`--jitter`, `--radius-ratio*`, `--spacing-ratio`, `--margin`) i
 ### Image Files
 - TIF format (grayscale, uint8)
 - Filename: `image_XXXX.tif`
+
+**Error tolerance:** at the default 256×256 resolution, a circle's position can't be pinned down more precisely than one pixel (1/256 ≈ 0.39% of image width), and radius inherits √2 times that, since it depends on two independent edge positions. This is the baseline value in every ground-truth file's `uncertainties` field (see Uncertainty Model below) — a detection shouldn't be judged wrong for missing by less than this amount. It's a simplified stand-in for the more detailed discretization error a real camera model would have; it is not meant to reproduce that in full.
 
 ### Ground Truth JSON
 Example structure matching Zenodo convention:

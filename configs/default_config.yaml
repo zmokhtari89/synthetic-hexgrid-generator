@@ -1,22 +1,25 @@
-# hex-grid packing geometry (previously hardcoded as python defaults in
-# main.py/core.py, not configurable at all). radius_ratio: circle radius as
-# a fraction of image width, used only if radius_ratio_min/max are unset.
-# radius_ratio_min/max: draw one radius per image from this range instead of
-# a fixed radius_ratio - matches real Zenodo data, where radius is constant
-# within one image but differs between images (see
-# docs/task_plan_reviewed.md item 3). spacing_ratio: center-to-center
-# spacing as a fraction of the max spacing that would still avoid overlap -
-# must be <0.5. margin: clear border kept free of circles, in pixels.
-# jitter_std: random position jitter std, in pixels. CLI flags
-# (--radius-ratio/--radius-ratio-min/--radius-ratio-max/--spacing-ratio/
-# --margin/--jitter) override these when passed.
+# hex-grid packing geometry - used to be hardcoded in main.py/core.py, now
+# configurable here or via CLI flags (--radius-ratio/--radius-ratio-min/
+# --radius-ratio-max/--spacing-ratio/--margin/--jitter), which take priority
+# over these values.
+#
+# radius_ratio: circle radius as a fraction of image width, used only if
+# radius_ratio_min/max are unset.
+# radius_ratio_min/max: draw a different radius per image from this range
+# instead of a fixed radius_ratio (matches real Zenodo data: radius is
+# constant within one image but varies between images).
+# spacing_ratio: center-to-center spacing as a fraction of the max spacing
+# that would still avoid overlap, must be <0.5.
+# margin: clear border kept free of circles, in pixels.
+# jitter_std: random position jitter, in pixels. Off by default - real
+# Zenodo circles sit exactly on the grid, with no jitter.
 generator:
   radius_ratio: 0.049
   radius_ratio_min: 0.036
   radius_ratio_max: 0.050
   spacing_ratio: 0.48
   margin: 15.0
-  jitter_std: 2.0
+  jitter_std: 0.0
 
 # artifact probabilities and strengths
 noise_prob: 0.3
@@ -31,13 +34,11 @@ illumination_prob: 0.3
 
 missing_prob: 0.3
 
-# uncertainty scaling parameters (physics-informed, GUM-style quadrature
-# combination of independent contributions; see compute_uncertainties() in
-# src/utils/io_utils.py for the exact formula per artifact type)
-# blur uses an exact closed form fit to real Zenodo ground truth and takes
-# no config parameters; missing needs none either (no inflation, a=0).
-# a/b below are in pixel-equivalents (divided by width internally, same
-# convention as the 1-pixel baseline term), not fitted values.
+# uncertainty scaling for noise and illumination, see compute_uncertainties()
+# in src/utils/io_utils.py. Blur and missing need no parameters here: blur
+# uses a fixed formula fitted to real Zenodo blur data, and missing adds no
+# extra uncertainty. a/b below are first-principles guesses, not fitted to
+# any measured data.
 uncertainty:
   noise:
     a: 0.5
