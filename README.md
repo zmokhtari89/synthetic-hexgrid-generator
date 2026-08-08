@@ -28,7 +28,7 @@ This tool generates grayscale images (TIF format) with circles arranged on a hex
 
 ```bash
 # Clone repository
-git clone <repository-url>
+git clone git@github.com:zmokhtari89/synthetic-hexgrid-generator.git
 cd synthetic_hexgrid_generator
 
 # Create virtual environment
@@ -39,9 +39,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Dependencies
-Listed in `requirements.txt`:
-`numpy`, `opencv-python`, `scikit-image`, `tifffile`, `pyyaml`, `matplotlib`, `scipy`, `pytest`
+Dependencies are listed in `requirements.txt`.
 
 ---
 
