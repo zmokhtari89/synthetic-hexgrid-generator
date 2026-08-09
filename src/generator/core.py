@@ -68,17 +68,23 @@ class HexgridGenerator:
         jitter_std = jitter if jitter is not None else self.config.jitter_std
         
         u, v = self._basis_vectors
-        
-        nx = int((width - 2 * margin) / s) + 3
+
         ny = int((height - 2 * margin) / (s * np.sqrt(3) / 2)) + 3
-        
+
         candidates = []
-        
-        for i in range(-1, nx + 1):
-            for j in range(-1, ny + 1):
+
+        for j in range(-1, ny + 1):
+            # v has a nonzero x-component, so each row is shifted in x by
+            # j * v[0] relative to row 0; shift the i-range along with it,
+            # otherwise higher rows drift out of the left margin and leave
+            # that corner of the image empty
+            row_offset = j * v[0]
+            i_min = int(np.floor((margin - row_offset) / u[0])) - 1
+            i_max = int(np.ceil((width - margin - row_offset) / u[0])) + 1
+            for i in range(i_min, i_max + 1):
                 x = i * u[0] + j * v[0]
                 y = i * u[1] + j * v[1]
-                
+
                 if margin <= x <= width - margin and margin <= y <= height - margin:
                     candidates.append(Circle(x=x, y=y, r=radius))
         
