@@ -122,8 +122,7 @@ Each circle's ground truth includes an uncertainty for x, y, and r, computed in 
 **On top of the baseline, per artifact:**
 
 - **Blur:** `σ_r = σ_xy × √(2 + S²)`, a form found by fitting to the real Zenodo blur measurements. It also matches how blur should behave physically: blurring smears the circle's edge outward without shifting its center on average, so position stays about as precise as the baseline while radius gets harder to pin down as blur increases.
-- **Noise:** an extra term grows with noise strength and is added in quadrature to both σ_xy and σ_r, since random pixel noise perturbs the whole estimate, not just the edge.
-- **Illumination:** an uneven brightness gradient is a one-sided bias rather than random spread, so it is first bounded and then converted to a comparable uncertainty before being added in quadrature.
+- **Noise & illumination:** neither has real measurements to fit against, so both use the same guess: `a × S` is a bound on how far off a detector's estimate could plausibly be, converted to a standard uncertainty via the GUM rectangular-distribution rule (`u = bound/√3`, JCGM 100:2008 §4.3.7), then added in quadrature.
 
 ---
 
@@ -151,8 +150,8 @@ blur_prob: 0.3
 illumination_prob: 0.3
 
 uncertainty:
-  noise:         {a: 0.5,  b: 1.0}  # first-principles stand-in
-  illumination:  {a: 10.0, b: 1.0}  # first-principles stand-in
+  noise:         {a: 0.5}   # first-principles stand-in
+  illumination:  {a: 10.0}  # first-principles stand-in
 ```
 
 ---

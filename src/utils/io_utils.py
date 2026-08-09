@@ -27,33 +27,18 @@ def load_tif(filepath: Path) -> np.ndarray:
 def compute_uncertainties(artifact_type: str, artifact_strength: float,
                           image_size: tuple, config: dict) -> tuple:
     """
-    compute x,y and r uncertainties, combining independent contributions in
-    quadrature (GUM-style uncertainty propagation)
+    x,y,r uncertainties, combined in quadrature (GUM-style propagation)
 
-    baseline (always present): σ_xy = 1/width (1 pixel edge localization
-    limit), σ_r,base = √2 × σ_xy (diameter → radius propagation of two
-    independent unit-pixel limits)
+    baseline: σ_xy = 1/width, σ_r = √2 × σ_xy (pixel discretization)
 
-    per artifact type, on top of the baseline:
-    - blur: exact closed form fit to real Zenodo ground truth,
-      σ_r(S) = σ_xy × √(2 + S²) — a symmetric blur kernel keeps a
-      centroid-style position estimate unbiased, so σ_xy is untouched and
-      only σ_r grows.
-    - noise: additive pixel noise perturbs every pixel a position/radius
-      estimate is built from, unlike blur — no Zenodo ground truth exists
-      to fit this exactly, so it's a first-principles stand-in
-      (h(N) = a×N^b pixel-equivalents, i.e. /width like the baseline)
-      added in quadrature to *both* σ_xy and σ_r.
-    - illumination: a non-uniform gradient is a GUM Type B *systematic*
-      bias (photogrammetry literature: "eccentricity error"), not random
-      spread — bounded by a first-principles stand-in ε(S) = a×S^b
-      pixel-equivalents and converted to a standard uncertainty via the
-      GUM rectangular-distribution rule (u = ε/√3, since only the bound is
-      known, not a distribution shape), then added in quadrature to both
-      σ_xy and σ_r.
+    blur: σ_r(S) = σ_xy × √(2 + S²), fit to real Zenodo ground truth; a
+    symmetric kernel leaves σ_xy unchanged.
 
-    both non-blur scalings are unvalidated first-principles assumptions (no
-    Zenodo ground truth exists for noise/illumination variants), not fits.
+    noise/illumination: no detector or measurement exists to tell us how
+    far off a circle estimate would actually be under these artifacts, so
+    a×S is a guessed bound on that error, converted to a standard
+    uncertainty via the GUM rectangular-distribution rule u = bound/√3
+    (JCGM 100:2008 §4.3.7), then added in quadrature. unvalidated.
     """
     width, height = image_size
 
@@ -71,23 +56,13 @@ def compute_uncertainties(artifact_type: str, artifact_strength: float,
         sigma_r = base_xy * np.sqrt(2 + S ** 2)
         return sigma_xy, sigma_r
 
-    if artifact_type == 'noise':
-        artifact_params = params.get('noise', {'a': 0.5, 'b': 1.0})
-        a = artifact_params.get('a', 0.5)
-        b = artifact_params.get('b', 1.0)
-        noise_term = a * (S ** b) / width  # pixel-equivalents -> normalized
-        sigma_xy = np.sqrt(base_xy ** 2 + noise_term ** 2)
-        sigma_r = np.sqrt(base_r ** 2 + noise_term ** 2)
-        return sigma_xy, sigma_r
-
-    if artifact_type == 'illumination':
-        artifact_params = params.get('illumination', {'a': 10.0, 'b': 1.0})
-        a = artifact_params.get('a', 10.0)
-        b = artifact_params.get('b', 1.0)
-        bound = a * (S ** b) / width  # pixel-equivalents -> normalized
-        u_illum = bound / np.sqrt(3)
-        sigma_xy = np.sqrt(base_xy ** 2 + u_illum ** 2)
-        sigma_r = np.sqrt(base_r ** 2 + u_illum ** 2)
+    if artifact_type in ('noise', 'illumination'):
+        default_a = 0.5 if artifact_type == 'noise' else 10.0
+        a = params.get(artifact_type, {}).get('a', default_a)
+        bound = a * S / width
+        u = bound / np.sqrt(3)
+        sigma_xy = np.sqrt(base_xy ** 2 + u ** 2)
+        sigma_r = np.sqrt(base_r ** 2 + u ** 2)
         return sigma_xy, sigma_r
 
     return base_xy, base_r

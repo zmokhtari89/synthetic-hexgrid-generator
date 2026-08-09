@@ -38,12 +38,11 @@ illumination_prob: 0.3
 
 # uncertainty scaling for noise and illumination, see compute_uncertainties()
 # in src/utils/io_utils.py. Blur needs no parameters here: it uses a fixed
-# formula fitted to real Zenodo blur data. a/b below are first-principles
-# guesses, not fitted to any measured data.
+# formula fitted to real Zenodo blur data. `a` below is a first-principles
+# guess (bound on detector error, converted via JCGM 100:2008 §4.3.7's
+# rectangular-distribution rule), not fitted to any measured data.
 uncertainty:
   noise:
     a: 0.5
-    b: 1.0
   illumination:
     a: 10.0
-    b: 1.0
