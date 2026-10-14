@@ -1,6 +1,6 @@
 # Synthetic Hexgrid Generator
 
-Python implementation of a configurable synthetic dataset generator for circle detection tasks, developed for Position 26-93-8C.
+Python implementation of a configurable synthetic dataset generator for circle detection tasks.
 
 ## Overview
 
